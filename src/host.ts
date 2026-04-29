@@ -13,7 +13,17 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
-import type { ServerConfig } from "./index.js";
+/**
+ * Narrow shape the host needs to spawn an MCP child. The richer config
+ * (trust, endpointMode, direct/adapter discriminator) lives in src/config.ts;
+ * the entrypoint resolves it down to this before spawning.
+ */
+export interface HostSpawnConfig {
+	name: string;
+	command: string;
+	args?: string[];
+	env?: Record<string, string>;
+}
 
 export type CrudeVerb = "create" | "read" | "update" | "delete" | "execute";
 
@@ -41,7 +51,7 @@ const TOOL_FOR_VERB: Record<CrudeVerb, string> = {
 	execute: "mcp_aql_execute",
 };
 
-export async function spawnHost(config: ServerConfig): Promise<MCPHost> {
+export async function spawnHost(config: HostSpawnConfig): Promise<MCPHost> {
 	const env = config.env ? { ...filteredProcessEnv(), ...config.env } : undefined;
 
 	const transport = new StdioClientTransport({
