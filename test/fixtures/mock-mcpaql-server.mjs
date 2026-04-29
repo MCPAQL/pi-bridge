@@ -68,6 +68,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 				operations: [
 					{ name: "introspect", endpoint: "READ", description: "self" },
 					{ name: "echo", endpoint: "READ", description: "echo" },
+					{ name: "echo_env", endpoint: "READ", description: "echo a process.env value" },
 				],
 			},
 		});

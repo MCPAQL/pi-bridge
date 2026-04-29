@@ -29,6 +29,8 @@ export {
 	MCPAQL_CONFIG_SCHEMA,
 } from "./config.js";
 
+export type { CrudeError, CrudeResponse, CrudeVerb, MCPHost } from "./host.js";
+
 /**
  * Project a ResolvedServerConfig down to a HostSpawnConfig and spawn the
  * child. Direct-mode passes command/args straight through; adapter-mode

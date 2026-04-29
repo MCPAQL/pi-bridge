@@ -124,6 +124,8 @@ test("env interpolation flows from config through spawn into the child process",
 					command: "node",
 					args: [MOCK],
 					env: { OBSERVED: "${env:MCPAQL_ENTRY_TEST_SOURCE}" },
+					trust: "developer",
+					endpointMode: "multi",
 				},
 			],
 		});
