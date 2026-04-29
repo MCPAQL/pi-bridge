@@ -48,3 +48,82 @@ test("surfaces MALFORMED_RESPONSE for null/undefined input", () => {
 	const r2 = parseCrudeResponse(undefined);
 	assert.equal(r2.success, false);
 });
+
+test("extracts warnings array on success when shape is well-formed", () => {
+	const r = parseCrudeResponse({
+		structuredContent: {
+			success: true,
+			data: { ok: 1 },
+			warnings: [
+				{ code: "DEPRECATED_FIELD", message: "use new_field" },
+				{
+					code: "PARTIAL_RESULT",
+					message: "stopped at 1000",
+					severity: "medium",
+					details: { count: 1000 },
+				},
+			],
+		},
+	});
+	assert.equal(r.success, true);
+	assert.equal(r.warnings?.length, 2);
+	assert.equal(r.warnings[0].code, "DEPRECATED_FIELD");
+	assert.equal(r.warnings[1].severity, "medium");
+	assert.deepEqual(r.warnings[1].details, { count: 1000 });
+});
+
+test("drops malformed warnings entries silently, keeps valid ones", () => {
+	const r = parseCrudeResponse({
+		structuredContent: {
+			success: true,
+			data: {},
+			warnings: [
+				{ code: "OK", message: "kept" },
+				{ code: "no message" },
+				"not even an object",
+				{ message: "no code" },
+				null,
+			],
+		},
+	});
+	assert.equal(r.warnings?.length, 1);
+	assert.equal(r.warnings[0].code, "OK");
+});
+
+test("omits warnings field entirely when array is empty or missing", () => {
+	const a = parseCrudeResponse({ structuredContent: { success: true, data: {}, warnings: [] } });
+	assert.equal("warnings" in a, false);
+	const b = parseCrudeResponse({ structuredContent: { success: true, data: {} } });
+	assert.equal("warnings" in b, false);
+});
+
+test("extracts confirmation envelope on CONFIRMATION_REQUIRED failure", () => {
+	const r = parseCrudeResponse({
+		structuredContent: {
+			success: false,
+			error: { code: "CONFIRMATION_REQUIRED", message: "needs approval" },
+			confirmation: {
+				token: "tok-abc",
+				expires_at: "2026-04-29T20:00:00Z",
+				message: "delete 47 records?",
+				reasons: ["destructive"],
+			},
+		},
+	});
+	assert.equal(r.success, false);
+	assert.equal(r.confirmation?.token, "tok-abc");
+	assert.deepEqual(r.confirmation?.reasons, ["destructive"]);
+});
+
+test("drops malformed confirmation envelope (missing token) but preserves error", () => {
+	const r = parseCrudeResponse({
+		structuredContent: {
+			success: false,
+			error: { code: "CONFIRMATION_REQUIRED", message: "needs approval" },
+			confirmation: { expires_at: "2026-04-29T20:00:00Z" },
+		},
+	});
+	assert.equal(r.success, false);
+	assert.equal(r.error.code, "CONFIRMATION_REQUIRED");
+	assert.equal(r.confirmation, undefined);
+});

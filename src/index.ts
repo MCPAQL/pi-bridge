@@ -29,7 +29,16 @@ export {
 	MCPAQL_CONFIG_SCHEMA,
 } from "./config.js";
 
-export type { CrudeError, CrudeResponse, CrudeVerb, MCPHost } from "./host.js";
+export type {
+	CrudeConfirmation,
+	CrudeError,
+	CrudeResponse,
+	CrudeVerb,
+	CrudeWarning,
+	MCPHost,
+} from "./host.js";
+
+export { BridgeToolError } from "./errors.js";
 
 /**
  * Project a ResolvedServerConfig down to a HostSpawnConfig and spawn the

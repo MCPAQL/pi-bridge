@@ -9,14 +9,15 @@
  * failure throws so Pi surfaces the error to the LLM.
  *
  * Walking-skeleton scope: multi mode only. Unified mode, field selection,
- * and batch passthrough are tracked under #5/#12. Richer error mapping
- * (preserving codes, distinguishing recoverable failures) is #11.
+ * and batch passthrough are tracked under #5/#12. The retry flow that
+ * BridgeToolError.requiresConfirmation enables is tracked in #8.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { type Static, Type } from "typebox";
 
-import type { CrudeVerb, MCPHost } from "./host.js";
+import { BridgeToolError } from "./errors.js";
+import type { CrudeVerb, CrudeWarning, MCPHost } from "./host.js";
 
 const VERBS: readonly CrudeVerb[] = ["create", "read", "update", "delete", "execute"] as const;
 
@@ -42,6 +43,14 @@ const VERB_DESCRIPTIONS: Record<CrudeVerb, string> = {
 	execute: "runtime lifecycle operations (non-idempotent)",
 };
 
+function formatWarnings(warnings: CrudeWarning[]): string {
+	const lines = warnings.map((w) => {
+		const sev = w.severity ? ` (${w.severity})` : "";
+		return `[${w.code}]${sev} ${w.message}`;
+	});
+	return `${warnings.length} warning${warnings.length === 1 ? "" : "s"}:\n${lines.join("\n")}`;
+}
+
 export function registerCrudeTools(pi: ExtensionAPI, host: MCPHost): void {
 	for (const verb of VERBS) {
 		const toolName = `${host.serverName}_${verb}`;
@@ -53,17 +62,34 @@ export function registerCrudeTools(pi: ExtensionAPI, host: MCPHost): void {
 			async execute(_toolCallId, params: Params) {
 				const response = await host.call(verb, params.operation, params.params ?? {});
 				if (response.success) {
+					const content = [
+						{ type: "text" as const, text: JSON.stringify(response.data, null, 2) },
+					];
+					if (response.warnings && response.warnings.length > 0) {
+						content.push({ type: "text" as const, text: formatWarnings(response.warnings) });
+					}
 					return {
-						content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }],
+						content,
 						details: {
 							server: host.serverName,
 							verb,
 							operation: params.operation,
 							data: response.data,
+							...(response.warnings && response.warnings.length > 0
+								? { warnings: response.warnings }
+								: {}),
 						},
 					};
 				}
-				throw new Error(`[${response.error.code}] ${response.error.message}`);
+				throw new BridgeToolError({
+					code: response.error.code,
+					message: response.error.message,
+					details: response.error.details,
+					confirmation: response.confirmation,
+					server: host.serverName,
+					verb,
+					operation: params.operation,
+				});
 			},
 		});
 	}
