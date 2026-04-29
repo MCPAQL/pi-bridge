@@ -10,10 +10,11 @@
  *      in a follow-up. Checked first so a leading `git:` is never mistaken
  *      for an npm package whose name happens to start with `git`.
  *
- *   2. **Local path** — absolute, `./relative`, `../relative`, `~/home`,
- *      bare `~`, or Windows drive paths. Convention: `<path>/dist/server.js`
- *      is the entry. Spawned with `node`. Checked second so explicit local
- *      forms always win over ambiguous interpretation.
+ *   2. **Local path** — absolute, `./relative`, `../relative`, bare `.`,
+ *      bare `..`, `~/home`, bare `~`, or Windows drive paths. Convention:
+ *      `<path>/dist/server.js` is the entry. Spawned with `node`. Checked
+ *      second so explicit local forms always win over ambiguous
+ *      interpretation.
  *
  *   3. **npm package** — bare name like `@mcpaql/foo`, `pkg`, or
  *      version-pinned `pkg@1.2.3` / `@scope/name@1.2.3`. Spawned via
