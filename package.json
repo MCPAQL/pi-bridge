@@ -22,7 +22,10 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:docker": "docker build -t mcpaql-pi-bridge-test . && docker run --rm mcpaql-pi-bridge-test",
+    "test:docker:shell": "docker build -t mcpaql-pi-bridge-test . && docker run --rm -it mcpaql-pi-bridge-test bash",
+    "test:matrix": "bash scripts/test-matrix.sh"
   },
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
