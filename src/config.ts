@@ -160,8 +160,21 @@ function ENDPOINT_MODE() {
 // inside oneOf branches, so the manual fallbacks in normalizeServer() are
 // the single source of truth. The schema's `default` annotations remain
 // for documentation / external tooling but aren't load-bearing.
-const ajv = new Ajv2020.default({
-	strict: false,
+//
+// strictSchema: false suppresses ajv's warning about those `default`
+// annotations being present without `useDefaults`. Other strict checks
+// (strict types, strict tuples) stay on — `strict: false` would have
+// disabled them too, which we don't want.
+//
+// The (Ajv2020 as ...).default ?? Ajv2020 dance survives a future ajv ESM
+// migration: today the import is CJS-over-ESM interop and the constructor
+// lives at .default; if ajv ships a real ESM build, .default goes away
+// and the fallback picks up the module export directly.
+const AjvCtor =
+	(Ajv2020 as unknown as { default?: typeof Ajv2020.default }).default ??
+	(Ajv2020 as unknown as typeof Ajv2020.default);
+const ajv = new AjvCtor({
+	strictSchema: false,
 	allErrors: true,
 });
 
@@ -201,7 +214,10 @@ export async function loadConfig(configPath: string = DEFAULT_CONFIG_PATH): Prom
 
 	if (!validateConfig(parsed)) {
 		const errs = (validateConfig.errors ?? [])
-			.map((e) => `  ${e.instancePath || "(root)"} ${e.message}${e.params ? ` ${JSON.stringify(e.params)}` : ""}`)
+			.map(
+				(e: { instancePath?: string; message?: string; params?: unknown }) =>
+					`  ${e.instancePath || "(root)"} ${e.message}${e.params ? ` ${JSON.stringify(e.params)}` : ""}`,
+			)
 			.join("\n");
 		throw new ConfigError(
 			`Schema validation failed for ${configPath}:\n${errs}`,

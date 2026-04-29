@@ -46,6 +46,15 @@ const piBridge = async function (pi: ExtensionAPI): Promise<void> {
 	}
 
 	for (const server of configResult?.servers ?? []) {
+		// Adapter resolution (#6) is not yet implemented. Surface this as an
+		// info-level notice rather than a warning, so users distinguish
+		// "feature isn't built yet" from "spawn actually failed".
+		if (server.kind === "adapter") {
+			notices.push(
+				`Server "${server.name}": kind="adapter" is not yet implemented — waiting on #6 (adapter package resolution). Skipping; use kind="direct" with command/args for now.`,
+			);
+			continue;
+		}
 		try {
 			hosts.push(await spawnAndRegister(pi, server));
 		} catch (err) {
@@ -84,8 +93,11 @@ async function spawnAndRegister(
 	server: ResolvedServerConfig,
 ): Promise<MCPHost> {
 	if (server.kind === "adapter") {
+		// Defense in depth — the loop above filters these out and surfaces a
+		// notice, but if a future code path reaches here, fail loud rather
+		// than spawn nothing.
 		throw new Error(
-			`adapter "${server.adapter}" — package resolution lands in #6; use direct: true with command/args for now.`,
+			`internal: kind="adapter" reached spawnAndRegister; the entrypoint should have filtered "${server.name}" out (waiting on #6).`,
 		);
 	}
 
