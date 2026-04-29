@@ -94,11 +94,14 @@ export function registerCrudeTools(pi: ExtensionAPI, host: MCPHost): void {
 						operation: params.operation,
 					});
 				}
+				// Don't pass confirmation here — the if above is the only path
+				// where response.confirmation would be set, so the base class
+				// receiving a defined confirmation would be an anomalous state
+				// the hierarchy is designed to make impossible.
 				throw new BridgeToolError({
 					code: response.error.code,
 					message: response.error.message,
 					details: response.error.details,
-					confirmation: response.confirmation,
 					server: host.serverName,
 					verb,
 					operation: params.operation,

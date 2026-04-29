@@ -52,14 +52,14 @@ export class BridgeToolError extends Error {
 	}
 
 	/**
-	 * True iff the upstream returned CONFIRMATION_REQUIRED with a usable
-	 * envelope — i.e. the error is an instance of ConfirmationRequiredError.
-	 * Convenience getter for consumers that don't want to depend on the
-	 * subclass; #8's retry flow should prefer the `instanceof` check
-	 * (narrows `confirmation` to non-undefined, so no null-check needed).
+	 * False on the base class; ConfirmationRequiredError overrides to
+	 * true. Convenience for consumers that don't want to import the
+	 * subclass — #8's retry flow should still prefer
+	 * `instanceof ConfirmationRequiredError` since that narrows
+	 * `confirmation` to non-undefined.
 	 */
 	get requiresConfirmation(): boolean {
-		return this instanceof ConfirmationRequiredError;
+		return false;
 	}
 }
 
@@ -70,8 +70,13 @@ export class BridgeToolError extends Error {
  * `expires_at` without null-checks inside an `instanceof` branch.
  */
 export class ConfirmationRequiredError extends BridgeToolError {
-	readonly name: string = "ConfirmationRequiredError";
-	readonly confirmation: CrudeConfirmation;
+	override readonly name: string = "ConfirmationRequiredError";
+	// The base class declares `confirmation?: CrudeConfirmation`; the
+	// override narrows to non-optional. The reassignment in the
+	// constructor below (after `super(...)` already set it) is what
+	// actually makes the narrowed type hold at runtime — required pattern,
+	// not dead code.
+	override readonly confirmation: CrudeConfirmation;
 
 	constructor(args: {
 		message: string;
@@ -91,5 +96,9 @@ export class ConfirmationRequiredError extends BridgeToolError {
 			operation: args.operation,
 		});
 		this.confirmation = args.confirmation;
+	}
+
+	override get requiresConfirmation(): boolean {
+		return true;
 	}
 }
