@@ -16,7 +16,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { type Static, Type } from "typebox";
 
-import { BridgeToolError } from "./errors.js";
+import { BridgeToolError, ConfirmationRequiredError } from "./errors.js";
 import type { CrudeVerb, CrudeWarning, MCPHost } from "./host.js";
 
 const VERBS: readonly CrudeVerb[] = ["create", "read", "update", "delete", "execute"] as const;
@@ -80,6 +80,19 @@ export function registerCrudeTools(pi: ExtensionAPI, host: MCPHost): void {
 								: {}),
 						},
 					};
+				}
+				if (
+					response.error.code === "CONFIRMATION_REQUIRED" &&
+					response.confirmation
+				) {
+					throw new ConfirmationRequiredError({
+						message: response.error.message,
+						details: response.error.details,
+						confirmation: response.confirmation,
+						server: host.serverName,
+						verb,
+						operation: params.operation,
+					});
 				}
 				throw new BridgeToolError({
 					code: response.error.code,

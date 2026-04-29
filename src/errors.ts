@@ -1,5 +1,5 @@
 /**
- * Structured error thrown by registered tools when the upstream MCP-AQL
+ * Structured errors thrown by registered tools when the upstream MCP-AQL
  * server returns `{ success: false, error: {...} }`. Pi's tool runtime
  * surfaces `error.message` to the model and logs, so we format `.message`
  * with the structured code prefix `[CODE] message` for at-a-glance
@@ -8,12 +8,24 @@
  * the instance so any caller that wants to introspect (custom Pi
  * extensions, the eventual confirmation flow in #8, downstream observers)
  * can pull them off without re-parsing the message string.
+ *
+ * Class hierarchy:
+ *   BridgeToolError                — generic upstream failure
+ *     └─ ConfirmationRequiredError — code=CONFIRMATION_REQUIRED + envelope
+ *
+ * The subclass guarantees a non-undefined `confirmation`, so #8's retry
+ * flow can `if (err instanceof ConfirmationRequiredError) { … err.confirmation.token … }`
+ * without null-checks. The `requiresConfirmation` getter on the base
+ * class is a convenience for consumers that don't want to import the
+ * subclass — it just delegates to `instanceof`.
  */
 
 import type { CrudeConfirmation } from "./host.js";
 
 export class BridgeToolError extends Error {
-	readonly name = "BridgeToolError";
+	// Typed as string (not the literal) so subclasses can override with
+	// their own name without TS2416 narrowing complaints.
+	readonly name: string = "BridgeToolError";
 	readonly code: string;
 	readonly details?: unknown;
 	readonly confirmation?: CrudeConfirmation;
@@ -40,11 +52,44 @@ export class BridgeToolError extends Error {
 	}
 
 	/**
-	 * True when the upstream signaled CONFIRMATION_REQUIRED with a usable
-	 * confirmation envelope. The retry flow lives in #8; today this just
-	 * gives consumers (and #8) a single boolean to gate on.
+	 * True iff the upstream returned CONFIRMATION_REQUIRED with a usable
+	 * envelope — i.e. the error is an instance of ConfirmationRequiredError.
+	 * Convenience getter for consumers that don't want to depend on the
+	 * subclass; #8's retry flow should prefer the `instanceof` check
+	 * (narrows `confirmation` to non-undefined, so no null-check needed).
 	 */
 	get requiresConfirmation(): boolean {
-		return this.code === "CONFIRMATION_REQUIRED" && this.confirmation !== undefined;
+		return this instanceof ConfirmationRequiredError;
+	}
+}
+
+/**
+ * Thrown when the upstream returns code=CONFIRMATION_REQUIRED with a
+ * usable confirmation envelope. The non-optional `confirmation` field
+ * (overriding the base class's optional one) lets #8 pull `token` and
+ * `expires_at` without null-checks inside an `instanceof` branch.
+ */
+export class ConfirmationRequiredError extends BridgeToolError {
+	readonly name: string = "ConfirmationRequiredError";
+	readonly confirmation: CrudeConfirmation;
+
+	constructor(args: {
+		message: string;
+		details?: unknown;
+		confirmation: CrudeConfirmation;
+		server: string;
+		verb: string;
+		operation: string;
+	}) {
+		super({
+			code: "CONFIRMATION_REQUIRED",
+			message: args.message,
+			details: args.details,
+			confirmation: args.confirmation,
+			server: args.server,
+			verb: args.verb,
+			operation: args.operation,
+		});
+		this.confirmation = args.confirmation;
 	}
 }

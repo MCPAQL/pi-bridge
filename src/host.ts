@@ -213,7 +213,9 @@ function parseWarnings(value: unknown): CrudeWarning[] | undefined {
 		};
 		if (typeof w.code !== "string" || typeof w.message !== "string") continue;
 		const warning: CrudeWarning = { code: w.code, message: w.message };
-		if (w.details && typeof w.details === "object") {
+		// Spec says details is `type: object` which JSON Schema excludes arrays
+		// from; `typeof [] === "object"` would otherwise pass this guard.
+		if (w.details && typeof w.details === "object" && !Array.isArray(w.details)) {
 			warning.details = w.details as Record<string, unknown>;
 		}
 		if (w.severity === "low" || w.severity === "medium" || w.severity === "high") {

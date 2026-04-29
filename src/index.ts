@@ -38,7 +38,7 @@ export type {
 	MCPHost,
 } from "./host.js";
 
-export { BridgeToolError } from "./errors.js";
+export { BridgeToolError, ConfirmationRequiredError } from "./errors.js";
 
 /**
  * Project a ResolvedServerConfig down to a HostSpawnConfig and spawn the

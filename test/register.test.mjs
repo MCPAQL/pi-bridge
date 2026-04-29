@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { BridgeToolError } from "../dist/errors.js";
+import { BridgeToolError, ConfirmationRequiredError } from "../dist/errors.js";
 import { registerCrudeTools } from "../dist/register.js";
 
 function mockPi() {
@@ -114,7 +114,7 @@ test("execute() throws BridgeToolError preserving structured error fields", asyn
 	);
 });
 
-test("execute() preserves confirmation envelope on CONFIRMATION_REQUIRED", async () => {
+test("execute() throws ConfirmationRequiredError on CONFIRMATION_REQUIRED + envelope", async () => {
 	const pi = mockPi();
 	const host = mockHost("svc", () => ({
 		success: false,
@@ -132,11 +132,14 @@ test("execute() preserves confirmation envelope on CONFIRMATION_REQUIRED", async
 	await assert.rejects(
 		tool.execute("c", { operation: "purge" }, undefined, undefined, {}),
 		(err) => {
-			assert.ok(err instanceof BridgeToolError);
+			assert.ok(err instanceof ConfirmationRequiredError, "expected subclass instance");
+			assert.ok(err instanceof BridgeToolError, "subclass extends base");
 			assert.equal(err.code, "CONFIRMATION_REQUIRED");
 			assert.equal(err.requiresConfirmation, true);
-			assert.equal(err.confirmation?.token, "tok-xyz");
-			assert.deepEqual(err.confirmation?.reasons, [
+			// Subclass narrows confirmation to non-optional — these reads
+			// don't need optional chaining and would fail typecheck if they did.
+			assert.equal(err.confirmation.token, "tok-xyz");
+			assert.deepEqual(err.confirmation.reasons, [
 				"Operation is destructive",
 				"Affects 47 records",
 			]);
@@ -145,9 +148,10 @@ test("execute() preserves confirmation envelope on CONFIRMATION_REQUIRED", async
 	);
 });
 
-test("requiresConfirmation is false when CONFIRMATION_REQUIRED has no envelope", async () => {
+test("CONFIRMATION_REQUIRED without envelope falls back to BridgeToolError", async () => {
 	// Defensive: an upstream that returns the code without the {token, expires_at}
-	// envelope can't be retried, so #8's flow must not engage.
+	// envelope can't be retried, so we throw the base class (NOT the subclass)
+	// — #8's `instanceof ConfirmationRequiredError` check skips it correctly.
 	const pi = mockPi();
 	const host = mockHost("svc", () => ({
 		success: false,
@@ -159,6 +163,8 @@ test("requiresConfirmation is false when CONFIRMATION_REQUIRED has no envelope",
 	await assert.rejects(
 		tool.execute("c", { operation: "purge" }, undefined, undefined, {}),
 		(err) => {
+			assert.ok(err instanceof BridgeToolError);
+			assert.equal(err instanceof ConfirmationRequiredError, false);
 			assert.equal(err.code, "CONFIRMATION_REQUIRED");
 			assert.equal(err.requiresConfirmation, false);
 			return true;

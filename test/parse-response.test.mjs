@@ -72,6 +72,21 @@ test("extracts warnings array on success when shape is well-formed", () => {
 	assert.deepEqual(r.warnings[1].details, { count: 1000 });
 });
 
+test("rejects array-shaped warning details (spec says type:object)", () => {
+	// Regression: typeof [] === "object" used to pass the parseWarnings
+	// guard, letting an array slip in as Record<string, unknown>. The spec
+	// says details is an object, not an array.
+	const r = parseCrudeResponse({
+		structuredContent: {
+			success: true,
+			data: {},
+			warnings: [{ code: "ARRAY_DETAILS", message: "test", details: [1, 2, 3] }],
+		},
+	});
+	assert.equal(r.warnings?.length, 1);
+	assert.equal(r.warnings[0].details, undefined);
+});
+
 test("drops malformed warnings entries silently, keeps valid ones", () => {
 	const r = parseCrudeResponse({
 		structuredContent: {
