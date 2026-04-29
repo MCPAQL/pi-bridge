@@ -36,32 +36,51 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools Bash Read Grep Glob'
           prompt: |
             You are reviewing pull request #${{ github.event.pull_request.number }}
-            on ${{ github.repository }}. Use `gh pr view` and `gh pr diff` (or
-            equivalent tools available to you) to read the PR.
+            on ${{ github.repository }}.
 
-            Always post one top-level review comment on the PR. The comment
-            must contain, in this order:
+            HARD REQUIREMENT: you MUST post exactly one top-level review comment
+            on this PR before exiting. This is non-negotiable. Exiting without
+            posting a top-level comment is a failure of the review, regardless
+            of how trivial the PR is or how few concerns you have.
 
-            **Summary** — 1–2 sentences describing what the PR changes.
+            STEP 1 — Read the PR. Run:
+              gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+              gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+            Read related source files as needed.
 
-            **Assessment** — one sentence: approve / request changes / comment,
-            with a one-line reason. If the PR is trivial or clearly correct,
-            say so explicitly; do not stay silent.
+            STEP 2 (mandatory, never skip) — Post the top-level review with:
+              gh pr review ${{ github.event.pull_request.number }} \
+                --repo ${{ github.repository }} \
+                --comment \
+                --body-file <path-to-review-file>
 
-            **Notes** — up to 5 bullets calling out anything a human reviewer
-            should look at: subtle correctness, security, test coverage gaps,
-            mismatch between PR description and actual diff, drift from the
-            project's existing patterns. If you have nothing to flag, write
-            "Nothing flagged."
+            Write the review body to a temporary file first (heredoc to a path
+            under /tmp), then pass it via --body-file. The body must contain
+            these three sections in this exact order:
 
-            You MAY additionally leave inline review comments on specific
-            lines — but only for actionable concerns. Do not leave inline
-            comments for nitpicks or style preferences. Inline comments are
-            in addition to the top-level summary, never instead of it.
+              **Summary** — 1–2 sentences describing what the PR changes.
 
-            Posting the top-level summary is mandatory even if you have no
-            inline comments. A green check with no visible review is hard to
-            interpret at a glance.
+              **Assessment** — one sentence: approve / request changes / comment,
+              with a one-line reason.
+
+              **Notes** — up to 5 bullets calling out anything a human reviewer
+              should look at. If nothing substantive, write "Nothing flagged."
+
+            If the PR is trivial or you have nothing meaningful to say, post
+            the minimum viable review — a one-line summary, "Comment — looks
+            fine.", and "Nothing flagged." Posting a near-empty review is
+            REQUIRED; posting nothing is FORBIDDEN.
+
+            STEP 3 — Verify the comment landed by running:
+              gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json reviews
+            The output must show your review. If it does not, retry STEP 2.
+
+            STEP 4 (optional) — You MAY additionally leave inline review
+            comments on specific lines for actionable concerns. Inline comments
+            never replace the top-level review from STEP 2.
+
+            Do not exit until STEP 2 has demonstrably posted a review.
 
