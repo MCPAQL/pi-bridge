@@ -29,6 +29,29 @@ export {
 	MCPAQL_CONFIG_SCHEMA,
 } from "./config.js";
 
+export type { CrudeError, CrudeResponse, CrudeVerb, MCPHost } from "./host.js";
+
+/**
+ * Project a ResolvedServerConfig down to a HostSpawnConfig and spawn the
+ * child. Direct-mode passes command/args straight through; adapter-mode
+ * goes through resolveAdapter() to turn the package/path spec into a
+ * spawn pair first. This is the only place the projection happens, so
+ * tests that exercise the loadConfig → spawnHost chain go through here.
+ */
+export async function spawnFromResolved(server: ResolvedServerConfig): Promise<MCPHost> {
+	const spawnSpec =
+		server.kind === "direct"
+			? { command: server.command, args: server.args }
+			: await resolveAdapter(server);
+
+	return spawnHost({
+		name: server.name,
+		command: spawnSpec.command,
+		args: spawnSpec.args,
+		env: server.env,
+	});
+}
+
 const piBridge = async function (pi: ExtensionAPI): Promise<void> {
 	const hosts: MCPHost[] = [];
 	const failures: string[] = [];
@@ -84,17 +107,7 @@ async function spawnAndRegister(
 	pi: ExtensionAPI,
 	server: ResolvedServerConfig,
 ): Promise<MCPHost> {
-	const spawnSpec =
-		server.kind === "direct"
-			? { command: server.command, args: server.args }
-			: await resolveAdapter(server);
-
-	const host = await spawnHost({
-		name: server.name,
-		command: spawnSpec.command,
-		args: spawnSpec.args,
-		env: server.env,
-	});
+	const host = await spawnFromResolved(server);
 	registerCrudeTools(pi, host);
 	return host;
 }

@@ -25,6 +25,8 @@
     "test": "node --test test/*.test.mjs",
     "presmoke:dollhouse": "npm run build",
     "smoke:dollhouse": "node scripts/smoke-dollhouse.mjs",
+    "presmoke:entrypoint": "npm run build",
+    "smoke:entrypoint": "node scripts/smoke-entrypoint.mjs",
     "test:docker": "docker build -t mcpaql-pi-bridge-test . && docker run --rm mcpaql-pi-bridge-test",
     "test:docker:shell": "docker build -t mcpaql-pi-bridge-test . && docker run --rm -it mcpaql-pi-bridge-test bash",
     "test:matrix": "bash scripts/test-matrix.sh"
