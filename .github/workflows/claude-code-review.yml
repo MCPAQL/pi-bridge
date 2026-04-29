@@ -1,0 +1,86 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    # Optional: Only run on specific file changes
+    # paths:
+    #   - "src/**/*.ts"
+    #   - "src/**/*.tsx"
+    #   - "src/**/*.js"
+    #   - "src/**/*.jsx"
+
+jobs:
+  claude-review:
+    # Optional: Filter by PR author
+    # if: |
+    #   github.event.pull_request.user.login == 'external-contributor' ||
+    #   github.event.pull_request.user.login == 'new-developer' ||
+    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools Bash Read Grep Glob'
+          prompt: |
+            You are reviewing pull request #${{ github.event.pull_request.number }}
+            on ${{ github.repository }}.
+
+            HARD REQUIREMENT: you MUST post exactly one top-level review comment
+            on this PR before exiting. This is non-negotiable. Exiting without
+            posting a top-level comment is a failure of the review, regardless
+            of how trivial the PR is or how few concerns you have.
+
+            STEP 1 — Read the PR. Run:
+              gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+              gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+            Read related source files as needed.
+
+            STEP 2 (mandatory, never skip) — Post the top-level review with:
+              gh pr review ${{ github.event.pull_request.number }} \
+                --repo ${{ github.repository }} \
+                --comment \
+                --body-file <path-to-review-file>
+
+            Write the review body to a temporary file first (heredoc to a path
+            under /tmp), then pass it via --body-file. The body must contain
+            these three sections in this exact order:
+
+              **Summary** — 1–2 sentences describing what the PR changes.
+
+              **Assessment** — one sentence: approve / request changes / comment,
+              with a one-line reason.
+
+              **Notes** — up to 5 bullets calling out anything a human reviewer
+              should look at. If nothing substantive, write "Nothing flagged."
+
+            If the PR is trivial or you have nothing meaningful to say, post
+            the minimum viable review — a one-line summary, "Comment — looks
+            fine.", and "Nothing flagged." Posting a near-empty review is
+            REQUIRED; posting nothing is FORBIDDEN.
+
+            STEP 3 — Verify the comment landed by running:
+              gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json reviews
+            The output must show your review. If it does not, retry STEP 2.
+
+            STEP 4 (optional) — You MAY additionally leave inline review
+            comments on specific lines for actionable concerns. Inline comments
+            never replace the top-level review from STEP 2.
+
+            Do not exit until STEP 2 has demonstrably posted a review.
+
