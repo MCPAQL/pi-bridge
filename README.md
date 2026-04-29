@@ -72,7 +72,7 @@ Configured via `~/.pi/mcpaql.config.json`:
 
 | Spec | Resolves to | Example |
 |---|---|---|
-| **Local path** (absolute, `./relative`, `../relative`, bare `..`, `~/home`, bare `~`) | `node <path>/dist/server.js` — convention is the entry lives at `dist/server.js` inside the directory | `/Users/me/adapters/github` |
+| **Local path** (absolute, `./relative`, `../relative`, bare `.`, bare `..`, `~/home`, bare `~`) | `node <path>/dist/server.js` — convention is the entry lives at `dist/server.js` inside the directory | `/Users/me/adapters/github` |
 | **npm package** (bare name, scoped, version-pinned) | `npx --yes <name>` — npx handles fetch + cache automatically | `@mcpaql/generated-github-mcp@1.2.3` |
 | **git URL** (`git:host/owner/repo@ref` or `git+https://…`) | *Not yet implemented — tracked in issue #31* | `git:github.com/user/repo@v1` |
 
