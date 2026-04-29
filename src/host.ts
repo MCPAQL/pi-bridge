@@ -81,7 +81,7 @@ function filteredProcessEnv(): Record<string, string> {
 	return out;
 }
 
-function parseCrudeResponse(result: unknown): CrudeResponse {
+export function parseCrudeResponse(result: unknown): CrudeResponse {
 	if (!result || typeof result !== "object") {
 		return malformed("Empty MCP response");
 	}

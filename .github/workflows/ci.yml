@@ -1,7 +1,6 @@
 # CI: typecheck and build on push/PR to main.
 #
-# Lint (biome) is a follow-up — see #16 comments. Tests land in #17 and add a
-# `npm test` step here. Spec conformance lands in #18.
+# Lint (biome) is a follow-up — see #16 comments. Spec conformance lands in #18.
 
 name: CI
 
@@ -35,3 +34,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Test
+        run: npm test

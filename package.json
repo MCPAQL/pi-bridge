@@ -21,7 +21,8 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo 'tests not yet wired up' && exit 0"
+    "pretest": "npm run build",
+    "test": "node --test test/*.test.mjs"
   },
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
