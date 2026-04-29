@@ -48,7 +48,7 @@ Configured via `~/.pi/mcpaql.config.json`:
       "name": "dollhouse",
       "transport": "stdio",
       "command": "npx",
-      "args": ["@dollhousemcp/mcp-server"],
+      "args": ["--yes", "@dollhousemcp/mcp-server"],
       "direct": true,
       "trust": "developer",
       "endpointMode": "multi"
@@ -57,7 +57,8 @@ Configured via `~/.pi/mcpaql.config.json`:
       "name": "github",
       "adapter": "@mcpaql/generated-github-mcp",
       "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_TOKEN}" },
-      "trust": "user"
+      "trust": "user",
+      "endpointMode": "multi"
     }
   ]
 }
@@ -95,7 +96,7 @@ The `dist/server.js` entry-point is convention; per-adapter entry overrides (or 
    cp examples/mcpaql.config.example.json ~/.pi/mcpaql.config.json
    ```
 
-2. **Trim it down to just the dollhouse entry** for now (the example also ships a `github` block that points at a placeholder local path; remove or repoint that one before launching pi):
+   The example ships only the dollhouse entry, so it's runnable as-is. For reference, the file looks like:
 
    ```jsonc
    {
@@ -113,15 +114,17 @@ The `dist/server.js` entry-point is convention; per-adapter entry overrides (or 
    }
    ```
 
-3. **Smoke-test the wiring** without booting pi:
+   `trust: "developer"` reduces gatekeeper-confirmation friction for this demo. For day-to-day workflows that touch destructive operations (`delete_element`, `clear`, `clear_github_auth`), drop to `"user"` — the loader's default — so dollhouse's gatekeeper prompts before each destructive call.
+
+2. **Smoke-test the wiring** without booting pi:
 
    ```bash
    npm run smoke:dollhouse
    ```
 
-   This spawns `npx --yes @dollhousemcp/mcp-server`, calls `read/introspect`, and prints the operations list. First run pulls the package; subsequent runs hit the npx cache.
+   This spawns `npx --yes @dollhousemcp/mcp-server@2.0.32`, calls `read/introspect`, and prints the operations list. First run pulls the package; subsequent runs hit the npx cache. Override the pin with `DOLLHOUSE_PKG=@dollhousemcp/mcp-server` to smoke against the latest published version.
 
-4. **Launch pi** with the bridge as an extension. Once registered, the LLM sees `dollhouse_create` / `dollhouse_read` / `dollhouse_update` / `dollhouse_delete` / `dollhouse_execute` and can call `dollhouse_read introspect` to discover what dollhouse offers.
+3. **Launch pi** with the bridge as an extension. Once registered, the LLM sees `dollhouse_create` / `dollhouse_read` / `dollhouse_update` / `dollhouse_delete` / `dollhouse_execute` and can call `dollhouse_read introspect` to discover what dollhouse offers.
 
 ### Adapter-mode equivalent
 

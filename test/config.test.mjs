@@ -219,24 +219,22 @@ test("unknown server field is rejected (additionalProperties: false)", async () 
 
 test("examples/mcpaql.config.example.json parses against MCPAQL_CONFIG_SCHEMA", async () => {
 	// Catches drift between the documented example and the loader's schema —
-	// the README walkthrough copies this file into ~/.pi/, so it must stay
-	// schema-valid even though the github adapter path is a placeholder.
+	// the README walkthrough copies this file into ~/.pi/ unedited, so it must
+	// stay schema-valid AND zero-config-runnable. loadConfig validates shape
+	// only; adapter-path filesystem checks happen at spawn time (resolve.ts),
+	// so this test runs anywhere regardless of paths in the file.
 	const examplePath = join(REPO_ROOT, "examples", "mcpaql.config.example.json");
 	const r = await loadConfig(examplePath);
 	assert.equal(r.loaded, true);
-	assert.equal(r.servers.length, 2);
+	assert.equal(r.servers.length, 1);
 
-	const dollhouse = r.servers.find((s) => s.name === "dollhouse");
-	assert.ok(dollhouse, "expected a 'dollhouse' server in the example");
+	const dollhouse = r.servers[0];
+	assert.equal(dollhouse.name, "dollhouse");
 	assert.equal(dollhouse.kind, "direct");
 	assert.equal(dollhouse.command, "npx");
 	assert.deepEqual(dollhouse.args, ["--yes", "@dollhousemcp/mcp-server"]);
 	assert.equal(dollhouse.trust, "developer");
 	assert.equal(dollhouse.endpointMode, "multi");
-
-	const github = r.servers.find((s) => s.name === "github");
-	assert.ok(github, "expected a 'github' server in the example");
-	assert.equal(github.kind, "adapter");
 });
 
 test("dollhouse direct-mode shape from the README parses as documented", async () => {

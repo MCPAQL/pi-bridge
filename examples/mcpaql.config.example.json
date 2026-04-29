@@ -8,13 +8,6 @@
       "direct": true,
       "trust": "developer",
       "endpointMode": "multi"
-    },
-    {
-      "name": "github",
-      "adapter": "/absolute/path/to/your/adapter",
-      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_TOKEN}" },
-      "trust": "user",
-      "endpointMode": "multi"
     }
   ]
 }

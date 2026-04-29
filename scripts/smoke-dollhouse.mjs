@@ -12,21 +12,31 @@
  *   npm run smoke:dollhouse
  *
  * Environment:
- *   DOLLHOUSE_PKG  — override the package spec (default: @dollhousemcp/mcp-server)
+ *   DOLLHOUSE_PKG  — override the pinned package spec (default below)
+ *
+ * The default is pinned to the version that produced the captured
+ * conformance fixture (test/fixtures/dollhouse-introspect.json) so smoke
+ * output stays in sync with the fixture by default. Use DOLLHOUSE_PKG to
+ * smoke against `@latest` before bumping the fixture.
  */
 //
-// Expected shape of a healthy run (truncated):
+// Expected shape of a healthy run (truncated). Note operation summaries
+// use `element_name` rather than the spec's `name` — that's the dollhouse
+// conformance gap pinned by test/conformance-dollhouse.test.mjs (#23).
 //   {
 //     "success": true,
 //     "data": {
-//       "_protocol": { "version": "...", "mode": "crude" },
-//       "operations": [ { "name": "list_elements", "endpoint": "READ", ... }, ... ]
+//       "operations": [
+//         { "element_name": "list_elements", "endpoint": "READ", ... },
+//         ...
+//       ]
 //     }
 //   }
 
 import { spawnHost } from "../dist/host.js";
 
-const PKG = process.env.DOLLHOUSE_PKG ?? "@dollhousemcp/mcp-server";
+const DEFAULT_PKG = "@dollhousemcp/mcp-server@2.0.32";
+const PKG = process.env.DOLLHOUSE_PKG ?? DEFAULT_PKG;
 
 const config = {
 	name: "dollhouse",
@@ -35,7 +45,8 @@ const config = {
 };
 
 async function main() {
-	console.log(`[smoke] spawning ${config.name} via npx ${PKG}…`);
+	console.log(`[smoke] package spec: ${PKG}${PKG === DEFAULT_PKG ? "" : " (overridden via DOLLHOUSE_PKG)"}`);
+	console.log(`[smoke] spawning ${config.name} via npx…`);
 	const host = await spawnHost(config);
 	console.log(`[smoke] connected. calling read/introspect…`);
 

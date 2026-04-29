@@ -35,6 +35,11 @@ const ROOT = resolve(HERE, "..");
 const AjvCtor = Ajv2020.default ?? Ajv2020;
 const addFormatsFn = addFormats.default ?? addFormats;
 
+// strict: false — accept the spec's `examples` keyword on schemas without
+// AJV erroring (it's a JSON Schema 2020-12 vocabulary keyword AJV doesn't
+// know about). allErrors: true — collect every violation so the gap test
+// below can find the specific one it's pinning instead of stopping at the
+// first.
 const ajv = new AjvCtor({ strict: false, allErrors: true });
 addFormatsFn(ajv);
 
@@ -73,15 +78,24 @@ test("dollhouse introspection currently fails strict introspection-response (doc
 		"dollhouse introspection unexpectedly passed strict schema — refresh the fixture and flip this assertion (#23 closed?)",
 	);
 
+	// Pin the SPECIFIC failure mode (the `element_name` divergence) rather
+	// than "any operations-level error" — otherwise a future fix to
+	// `element_name` could land alongside an unrelated new violation and
+	// the test would stay green for the wrong reason.
 	const errors = validateIntrospectionResponse.errors ?? [];
-	// At least one error must be about the OperationInfo shape — i.e. the
-	// `element_name` / missing `name` divergence. If the failure mode shifts
-	// to something else, that's also worth catching here.
-	const operationInfoErrors = errors.filter((e) =>
-		/operations/.test(e.instancePath ?? ""),
-	);
+	const elementNameErrors = errors.filter((e) => {
+		const onOperationsItem = /^\/data\/operations\/\d+/.test(e.instancePath ?? "");
+		if (!onOperationsItem) return false;
+		if (e.keyword === "additionalProperties" && e.params?.additionalProperty === "element_name") {
+			return true;
+		}
+		if (e.keyword === "required" && e.params?.missingProperty === "name") {
+			return true;
+		}
+		return false;
+	});
 	assert.ok(
-		operationInfoErrors.length > 0,
-		`expected schema errors on the operations array, got: ${JSON.stringify(errors)}`,
+		elementNameErrors.length > 0,
+		`expected the element_name/name divergence on operations items; got: ${JSON.stringify(errors)}`,
 	);
 });
