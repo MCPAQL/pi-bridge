@@ -66,8 +66,8 @@ Configured via `~/.pi/mcpaql.config.json`:
 
 - `direct: true` — server already speaks MCP-AQL natively; talk straight to its `mcp_aql_*` tools. Requires `command` and `args`.
 - `adapter: "<spec>"` — wrap a non-MCP-AQL server with a generated adapter, then expose that. The spec recognizes three forms (see *Adapter spec forms* below).
-- `endpointMode: "multi" | "unified"` — 5 separate Pi tools per server, or 1 unified tool with the operation name in params.
-- `trust` — gatekeeper trust level for this server (`untrusted` / `user` / `developer` / `admin`).
+- `endpointMode: "multi" | "unified"` — 5 separate Pi tools per server, or 1 unified tool with the operation name in params. Defaults to `"multi"`; shown explicitly above for clarity.
+- `trust` — gatekeeper trust level for this server (`untrusted` / `user` / `developer` / `admin`). Defaults to `"user"`.
 
 ### Adapter spec forms
 

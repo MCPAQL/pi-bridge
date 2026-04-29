@@ -38,6 +38,12 @@ import { spawnHost } from "../dist/host.js";
 const DEFAULT_PKG = "@dollhousemcp/mcp-server@2.0.32";
 const PKG = process.env.DOLLHOUSE_PKG ?? DEFAULT_PKG;
 
+// spawnHost consumes the narrow HostSpawnConfig (name/command/args/env only).
+// The richer shape from a real ~/.pi/mcpaql.config.json — `direct: true`,
+// `transport`, `trust`, `endpointMode` — lives on ResolvedServerConfig in
+// src/config.ts and is consumed by the entrypoint, not the host. Mirroring
+// those fields here would be silently dropped, so we omit them and document
+// that the smoke exercises only the spawn-and-call layer.
 const config = {
 	name: "dollhouse",
 	command: "npx",

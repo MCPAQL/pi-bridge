@@ -15,9 +15,11 @@
  * closes it, this test fails noisily and signals "refresh the fixture and
  * flip the assertion." Tracked in the deferred conformance issue (#23).
  *
- * Fixture provenance: captured by `npm run smoke:dollhouse` against
- * `@dollhousemcp/mcp-server@2.0.32` on 2026-04-29. Re-capture with the
- * smoke script when bumping the dollhouse version.
+ * Fixture provenance: captured by `npm run smoke:dollhouse` against the
+ * `DEFAULT_PKG` pinned in scripts/smoke-dollhouse.mjs (was
+ * `@dollhousemcp/mcp-server@2.0.32` on 2026-04-29). Re-capture when bumping
+ * `DEFAULT_PKG` — the smoke script is the single source of truth for the
+ * pinned version.
  */
 
 import { readFile } from "node:fs/promises";
