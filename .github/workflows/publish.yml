@@ -1,0 +1,65 @@
+# Publish: npm publish on v*.*.* tag.
+#
+# Triggered only by tag pushes matching `v*.*.*`. Runs the full
+# typecheck → build → test pipeline, verifies the tag matches
+# package.json version, then publishes to npm with public access.
+#
+# Required secrets:
+#   - NPM_TOKEN: a publish-scoped automation token for the @mcpaql org.
+#     Set in repo Settings → Secrets and variables → Actions.
+#
+# Note: package.json currently has `private: true` for the
+# walking-skeleton. This workflow will fail at the publish step with
+# `EPRIVATE` until package.json is flipped to publishable as part of
+# the first release prep.
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG_VER=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$PKG_VER" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} resolves to '${TAG}' which does not match package.json version '${PKG_VER}'"
+            exit 1
+          fi
+          echo "Tag and package.json version agree on ${PKG_VER}."
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Publish
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
