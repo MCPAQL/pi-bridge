@@ -6,10 +6,14 @@
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, test } from "node:test";
 
 import { ConfigError, loadConfig } from "../dist/config.js";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(HERE, "..");
 
 let workdir;
 let cfgPath;
@@ -211,4 +215,53 @@ test("unknown server field is rejected (additionalProperties: false)", async () 
 		servers: [{ name: "foo", direct: true, command: "x", bogus: 1 }],
 	});
 	await assert.rejects(loadConfig(cfgPath), ConfigError);
+});
+
+test("examples/mcpaql.config.example.json parses against MCPAQL_CONFIG_SCHEMA", async () => {
+	// Catches drift between the documented example and the loader's schema —
+	// the README walkthrough copies this file into ~/.pi/ unedited, so it must
+	// stay schema-valid AND zero-config-runnable. loadConfig validates shape
+	// only; adapter-path filesystem checks happen at spawn time (resolve.ts),
+	// so this test runs anywhere regardless of paths in the file.
+	const examplePath = join(REPO_ROOT, "examples", "mcpaql.config.example.json");
+	const r = await loadConfig(examplePath);
+	assert.equal(r.loaded, true);
+	assert.equal(r.servers.length, 1);
+
+	const dollhouse = r.servers[0];
+	assert.equal(dollhouse.name, "dollhouse");
+	assert.equal(dollhouse.kind, "direct");
+	assert.equal(dollhouse.command, "npx");
+	assert.deepEqual(dollhouse.args, ["--yes", "@dollhousemcp/mcp-server"]);
+	assert.equal(dollhouse.trust, "developer");
+	assert.equal(dollhouse.endpointMode, "multi");
+});
+
+test("dollhouse direct-mode shape from the README parses as documented", async () => {
+	// Locks in the canonical dollhouse direct-mode block. If the README's
+	// quick-start snippet drifts from what the loader accepts, this fails
+	// before users hit the loader's error path.
+	await writeCfg({
+		servers: [
+			{
+				name: "dollhouse",
+				transport: "stdio",
+				command: "npx",
+				args: ["--yes", "@dollhousemcp/mcp-server"],
+				direct: true,
+				trust: "developer",
+				endpointMode: "multi",
+			},
+		],
+	});
+	const r = await loadConfig(cfgPath);
+	assert.equal(r.servers.length, 1);
+	const s = r.servers[0];
+	assert.equal(s.kind, "direct");
+	assert.equal(s.name, "dollhouse");
+	assert.equal(s.transport, "stdio");
+	assert.equal(s.command, "npx");
+	assert.deepEqual(s.args, ["--yes", "@dollhousemcp/mcp-server"]);
+	assert.equal(s.trust, "developer");
+	assert.equal(s.endpointMode, "multi");
 });

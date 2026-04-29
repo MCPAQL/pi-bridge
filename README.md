@@ -48,7 +48,7 @@ Configured via `~/.pi/mcpaql.config.json`:
       "name": "dollhouse",
       "transport": "stdio",
       "command": "npx",
-      "args": ["@dollhousemcp/mcp-server"],
+      "args": ["--yes", "@dollhousemcp/mcp-server"],
       "direct": true,
       "trust": "developer",
       "endpointMode": "multi"
@@ -57,7 +57,8 @@ Configured via `~/.pi/mcpaql.config.json`:
       "name": "github",
       "adapter": "@mcpaql/generated-github-mcp",
       "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_TOKEN}" },
-      "trust": "user"
+      "trust": "user",
+      "endpointMode": "multi"
     }
   ]
 }
@@ -65,8 +66,8 @@ Configured via `~/.pi/mcpaql.config.json`:
 
 - `direct: true` — server already speaks MCP-AQL natively; talk straight to its `mcp_aql_*` tools. Requires `command` and `args`.
 - `adapter: "<spec>"` — wrap a non-MCP-AQL server with a generated adapter, then expose that. The spec recognizes three forms (see *Adapter spec forms* below).
-- `endpointMode: "multi" | "unified"` — 5 separate Pi tools per server, or 1 unified tool with the operation name in params.
-- `trust` — gatekeeper trust level for this server (`untrusted` / `user` / `developer` / `admin`).
+- `endpointMode: "multi" | "unified"` — 5 separate Pi tools per server, or 1 unified tool with the operation name in params. Defaults to `"multi"`; shown explicitly above for clarity.
+- `trust` — gatekeeper trust level for this server (`untrusted` / `user` / `developer` / `admin`). Defaults to `"user"`.
 
 ### Adapter spec forms
 
@@ -83,6 +84,66 @@ For local paths, the entry file at `<path>/dist/server.js` is checked for existe
 The `dist/server.js` entry-point is convention; per-adapter entry overrides (or `package.json#bin` lookup) are tracked as a follow-up.
 
 > **Platform note.** Windows drive-letter paths (e.g. `C:\path\to\adapter`) are recognized as a local-path shape so Windows users get a sensible error message rather than silent dispatch to npx, but the supported runtime for this package is Node 20+ on Linux/macOS. Windows is not on the release matrix.
+
+## Quick start with DollhouseMCP
+
+[DollhouseMCP](https://github.com/DollhouseMCP/mcp-server) speaks MCP-AQL natively, so you can wire it up without writing or generating an adapter. This is the fastest way to see the bridge end-to-end against a real server.
+
+1. **Copy the example config** to where the bridge looks for it:
+
+   ```bash
+   mkdir -p ~/.pi
+   cp examples/mcpaql.config.example.json ~/.pi/mcpaql.config.json
+   ```
+
+   The example ships only the dollhouse entry, so it's runnable as-is. For reference, the file looks like:
+
+   ```jsonc
+   {
+     "servers": [
+       {
+         "name": "dollhouse",
+         "transport": "stdio",
+         "command": "npx",
+         "args": ["--yes", "@dollhousemcp/mcp-server"],
+         "direct": true,
+         "trust": "developer",
+         "endpointMode": "multi"
+       }
+     ]
+   }
+   ```
+
+   `trust: "developer"` reduces gatekeeper-confirmation friction for this demo. For day-to-day workflows that touch destructive operations (`delete_element`, `clear`, `clear_github_auth`), drop to `"user"` — the loader's default — so dollhouse's gatekeeper prompts before each destructive call.
+
+2. **Smoke-test the wiring** without booting pi:
+
+   ```bash
+   npm run smoke:dollhouse
+   ```
+
+   This spawns `npx --yes @dollhousemcp/mcp-server@2.0.32`, calls `read/introspect`, and prints the operations list. First run pulls the package; subsequent runs hit the npx cache. Override the pin with `DOLLHOUSE_PKG=@dollhousemcp/mcp-server` to smoke against the latest published version.
+
+3. **Launch pi** with the bridge as an extension. Once registered, the LLM sees `dollhouse_create` / `dollhouse_read` / `dollhouse_update` / `dollhouse_delete` / `dollhouse_execute` and can call `dollhouse_read introspect` to discover what dollhouse offers.
+
+### Adapter-mode equivalent
+
+Same upstream, slightly different config shape — uses #6's npm resolver instead of `direct`:
+
+```jsonc
+{
+  "name": "dollhouse",
+  "adapter": "@dollhousemcp/mcp-server",
+  "trust": "developer",
+  "endpointMode": "multi"
+}
+```
+
+Both forms end up running `npx @dollhousemcp/mcp-server` as a stdio child. The `direct: true` form is canonical for natively-MCP-AQL servers; the `adapter:` form is the same npm-resolution path generated adapters use.
+
+### Known conformance gaps
+
+Live `read/introspect` against `@dollhousemcp/mcp-server` returns operations whose summary objects use `element_name` instead of the spec's `name` field. The bridge's discriminated-response envelope (`{ success, data }`) still validates, so call-and-response works end-to-end, but `OperationInfo`-shape strict validation flags this. The conformance test in `test/conformance-dollhouse.test.mjs` asserts both states (envelope passes, strict shape fails) and serves as a regression marker — when DollhouseMCP closes the gap, that test will need a fixture refresh.
 
 ## Installation
 
