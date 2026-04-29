@@ -31,7 +31,20 @@ export interface ServerConfig {
 }
 
 const HARDCODED_SERVERS: ServerConfig[] = [
-	// #13 fills this with the github MCP-AQL adapter entry.
+	{
+		name: "github",
+		transport: "stdio",
+		command: "node",
+		args: [
+			"/Users/mick/Developer/Organizations/MCPAQL/examples/generated/github-mcp/adapter/dist/server.js",
+		],
+		env: {
+			GITHUB_PERSONAL_ACCESS_TOKEN:
+				process.env.GITHUB_PERSONAL_ACCESS_TOKEN ?? process.env.GITHUB_TOKEN ?? "",
+		},
+		trust: "user",
+		endpointMode: "multi",
+	},
 ];
 
 const piBridge = async function (pi: ExtensionAPI): Promise<void> {
