@@ -13,6 +13,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 import { type MCPHost, spawnHost } from "./host.js";
+import { registerCrudeTools } from "./register.js";
 
 export type TrustLevel = "untrusted" | "user" | "developer" | "admin";
 
@@ -62,9 +63,8 @@ const piBridge = async function (pi: ExtensionAPI): Promise<void> {
 		}
 	});
 
-	for (const _host of hosts) {
-		// #5 — register `<server>_create|_read|_update|_delete|_execute` Pi tools
-		//      that proxy to host.call(verb, operation, params).
+	for (const host of hosts) {
+		registerCrudeTools(pi, host);
 	}
 
 	pi.on("session_shutdown", async () => {
