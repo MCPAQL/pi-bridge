@@ -43,6 +43,16 @@ export async function resolveAdapter(server: ResolvedAdapterConfig): Promise<Res
 		return resolveLocalPath(spec);
 	}
 
+	// Reject ambiguous specs that look like paths but aren't explicitly
+	// rooted. Without this, "adapters/my-server" would silently resolve to
+	// `npx adapters/my-server`, which is almost never what the user meant.
+	// The only legitimate slash-containing form for npm is @scope/name.
+	if (spec.includes("/") && !/^@[^/]+\/[^/]+$/.test(spec)) {
+		throw new Error(
+			`adapter "${spec}": looks like a path but isn't rooted. Prefix with "./" for a relative path, or use the npm scoped-package form @scope/name.`,
+		);
+	}
+
 	// Anything else: treat as an npm package name. npx handles cache + install.
 	return { command: "npx", args: ["--yes", spec] };
 }

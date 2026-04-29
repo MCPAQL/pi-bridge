@@ -58,6 +58,11 @@ test("absolute path with no dist/server.js → throws with the expected entry pa
 });
 
 test("relative ./path resolves against cwd", async () => {
+	// chdir is a global side effect, but node:test runs tests sequentially
+	// within a file by default, so this is safe as long as the finally block
+	// always restores the original cwd. If the test runner ever moves to
+	// concurrent-within-file execution, this needs a different approach
+	// (e.g., a relative-path helper that takes an explicit base directory).
 	await makeAdapterDir(workdir);
 	const cwd = process.cwd();
 	process.chdir(workdir);
@@ -74,7 +79,17 @@ test("relative ./path resolves against cwd", async () => {
 	}
 });
 
-test("~ expands to homedir", async () => {
+test("bare ~ expands to homedir", async () => {
+	// Resolves "~" by itself (not "~/something") to the home directory,
+	// then tries to find dist/server.js inside it. We don't expect a real
+	// adapter at homedir(), so this asserts on the helpful error message.
+	await assert.rejects(
+		resolveAdapter(adapterConfig("~")),
+		(err) => err instanceof Error && err.message.includes(join(homedir(), "dist", "server.js")),
+	);
+});
+
+test("~/path expands to homedir + path", async () => {
 	// We can't actually create files in homedir, so we just check that the
 	// path expansion produces a homedir-rooted entry — even if it doesn't
 	// exist (the test asserts on the error message, not on success).
@@ -94,6 +109,28 @@ test("plain (unscoped) npm package name → npx --yes <package>", async () => {
 	const r = await resolveAdapter(adapterConfig("some-package"));
 	assert.equal(r.command, "npx");
 	assert.deepEqual(r.args, ["--yes", "some-package"]);
+});
+
+test("ambiguous unrooted path-like spec → throws with explicit guidance", async () => {
+	// "adapters/my-server" looks like a relative path but isn't rooted with
+	// ./, ../, ~/, or /. Without rejection, this would silently resolve to
+	// `npx adapters/my-server`, which is almost never what the user meant.
+	await assert.rejects(
+		resolveAdapter(adapterConfig("adapters/my-server")),
+		(err) =>
+			err instanceof Error &&
+			/looks like a path but isn't rooted/.test(err.message) &&
+			/Prefix with "\.\/"/.test(err.message),
+	);
+});
+
+test("multi-segment scoped-package-shaped spec is also ambiguous", async () => {
+	// @scope/pkg is fine; @scope/pkg/extra is not a valid npm name, so we
+	// shouldn't quietly hand it to npx.
+	await assert.rejects(
+		resolveAdapter(adapterConfig("@scope/pkg/extra")),
+		(err) => err instanceof Error && /looks like a path but isn't rooted/.test(err.message),
+	);
 });
 
 test("git: URL → throws not-yet-implemented with mention of #6", async () => {
