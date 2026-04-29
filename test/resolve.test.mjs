@@ -111,6 +111,18 @@ test("plain (unscoped) npm package name → npx --yes <package>", async () => {
 	assert.deepEqual(r.args, ["--yes", "some-package"]);
 });
 
+test("version-pinned scoped package @scope/name@1.2.3 → npx --yes (passes regex check)", async () => {
+	const r = await resolveAdapter(adapterConfig("@mcpaql/foo@2.1.0"));
+	assert.equal(r.command, "npx");
+	assert.deepEqual(r.args, ["--yes", "@mcpaql/foo@2.1.0"]);
+});
+
+test("version-pinned unscoped package pkg@1.0.0 → npx --yes", async () => {
+	const r = await resolveAdapter(adapterConfig("some-package@1.0.0"));
+	assert.equal(r.command, "npx");
+	assert.deepEqual(r.args, ["--yes", "some-package@1.0.0"]);
+});
+
 test("ambiguous unrooted path-like spec → throws with explicit guidance", async () => {
 	// "adapters/my-server" looks like a relative path but isn't rooted with
 	// ./, ../, ~/, or /. Without rejection, this would silently resolve to
