@@ -57,11 +57,10 @@ test("absolute path with no dist/server.js → throws with the expected entry pa
 	);
 });
 
-test("permission denied on entry → distinguishes EACCES from missing file", async (t) => {
-	// chmod 000 on a file makes access(F_OK) succeed but access(R_OK) fail
-	// on POSIX — node's fs/promises access checks F_OK by default, so to
-	// trigger EACCES we need to drop permissions on the parent directory
-	// instead. CI runners running as root bypass perms entirely; skip there.
+test("permission denied on parent dir → EACCES surfaces with distinct message", async (t) => {
+	// chmod 0 on the parent dir blocks the access() probe regardless of the
+	// entry file's own perms. CI runners running as root bypass POSIX perms
+	// entirely; skip there.
 	if (process.getuid && process.getuid() === 0) {
 		t.skip("skipped: running as root, perms bypassed");
 		return;
@@ -78,9 +77,44 @@ test("permission denied on entry → distinguishes EACCES from missing file", as
 				err.message.includes(join(dir, "dist", "server.js")),
 		);
 	} finally {
-		// Restore perms so afterEach's rm() can clean up.
 		await chmod(distDir, 0o755);
 	}
+});
+
+test("permission denied on entry FILE → EACCES (R_OK probe, not F_OK)", async (t) => {
+	// This is the case the F_OK → R_OK change actually fixes. With F_OK
+	// (existence-only), a mode-000 file would have passed the probe and
+	// failed only at `node` spawn time. With R_OK, mode-000 yields EACCES
+	// up front so the user gets the helpful message instead of a runtime
+	// surprise. Skip on root since perms are bypassed.
+	if (process.getuid && process.getuid() === 0) {
+		t.skip("skipped: running as root, perms bypassed");
+		return;
+	}
+	const dir = await makeAdapterDir(workdir);
+	const entry = join(dir, "dist", "server.js");
+	await chmod(entry, 0o000);
+	try {
+		await assert.rejects(
+			resolveAdapter(adapterConfig(dir)),
+			(err) =>
+				err instanceof Error &&
+				/permission denied/i.test(err.message) &&
+				err.message.includes(entry),
+		);
+	} finally {
+		await chmod(entry, 0o644);
+	}
+});
+
+test("bare . routes through local resolution (not silent npx .)", async () => {
+	// Same justification as bare "..": no slash so the ambiguous-slash guard
+	// doesn't fire, and it's not an existing isLocalPath prefix. Without the
+	// explicit equality check, "." would silently fall through to `npx --yes .`.
+	await assert.rejects(
+		resolveAdapter(adapterConfig(".")),
+		(err) => err instanceof Error && /expected/.test(err.message),
+	);
 });
 
 test("bare .. routes through local resolution (not silent npx ..)", async () => {
@@ -196,14 +230,14 @@ test("multi-segment scoped-package-shaped spec is also ambiguous", async () => {
 	);
 });
 
-test("git: URL → throws not-yet-implemented with mention of #6", async () => {
+test("git: URL → throws not-yet-implemented with mention of #31", async () => {
 	await assert.rejects(
 		resolveAdapter(adapterConfig("git:github.com/user/repo@v1")),
 		(err) =>
 			err instanceof Error &&
 			/git:/.test(err.message) &&
 			/not yet implemented/.test(err.message) &&
-			/#6/.test(err.message),
+			/#31/.test(err.message),
 	);
 });
 

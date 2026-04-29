@@ -37,6 +37,7 @@
  *     spec `{ path, entry }`.
  */
 
+import { constants as fsConstants } from "node:fs";
 import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
@@ -62,7 +63,7 @@ export async function resolveAdapter(server: ResolvedAdapterConfig): Promise<Res
 
 	if (spec.startsWith("git:") || spec.startsWith("git+")) {
 		throw new Error(
-			`adapter "${spec}": git: URLs are not yet implemented. Use a local path or an npm package name for now (tracked separately as a follow-up to #6).`,
+			`adapter "${spec}": git: URLs are not yet implemented (tracked in #31). Use a local path or an npm package name for now.`,
 		);
 	}
 
@@ -81,7 +82,12 @@ export async function resolveAdapter(server: ResolvedAdapterConfig): Promise<Res
 
 function isLocalPath(spec: string): boolean {
 	if (isAbsolute(spec)) return true;
-	if (spec.startsWith("./") || spec === ".." || spec.startsWith("../")) return true;
+	// Bare "." and ".." plus prefixed forms. Without the bare-equality checks,
+	// these would match no other branch and silently fall through to `npx .`
+	// or `npx ..` — valid npm semantics ("run the package in CWD") but almost
+	// never what the user intended in a config file.
+	if (spec === "." || spec.startsWith("./")) return true;
+	if (spec === ".." || spec.startsWith("../")) return true;
 	if (spec.startsWith("~/") || spec === "~") return true;
 	// Windows drive-letter absolute paths — `C:\foo`, `D:/bar`. Recognized
 	// defensively so a Windows user pasting a drive path gets a sensible
@@ -98,14 +104,16 @@ async function resolveLocalPath(spec: string): Promise<ResolvedSpawn> {
 	const entry = join(absolute, DEFAULT_ENTRY_RELATIVE);
 
 	// Probe the entry up front so config errors surface at startup rather
-	// than at first tool call. We narrow on the error code so each failure
-	// mode gets actionable feedback:
+	// than at first tool call. R_OK rather than F_OK so a mode-000 file
+	// produces EACCES (existence + readable), not just F_OK (existence).
+	// We narrow on the error code so each failure mode gets actionable
+	// feedback:
 	//   ENOENT → "build the adapter first / wrong path"
 	//   EACCES → "permission denied / check perms"
 	//   anything else (EMFILE, EIO, …) → propagate verbatim, since giving
 	//     it our generic message would actively mislead the user.
 	try {
-		await access(entry);
+		await access(entry, fsConstants.R_OK);
 	} catch (err) {
 		if (isNodeError(err) && err.code === "EACCES") {
 			throw new Error(
