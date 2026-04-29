@@ -156,10 +156,13 @@ function ENDPOINT_MODE() {
 	} as const;
 }
 
+// useDefaults is intentionally OFF: ajv v8 doesn't reliably fill defaults
+// inside oneOf branches, so the manual fallbacks in normalizeServer() are
+// the single source of truth. The schema's `default` annotations remain
+// for documentation / external tooling but aren't load-bearing.
 const ajv = new Ajv2020.default({
 	strict: false,
 	allErrors: true,
-	useDefaults: true,
 });
 
 const validateConfig = ajv.compile(MCPAQL_CONFIG_SCHEMA);
@@ -172,9 +175,9 @@ export async function loadConfig(configPath: string = DEFAULT_CONFIG_PATH): Prom
 		notices: [],
 	};
 
-	let raw: string;
+	let fileContent: string;
 	try {
-		raw = await readFile(configPath, "utf8");
+		fileContent = await readFile(configPath, "utf8");
 	} catch (err) {
 		if (isNodeError(err) && err.code === "ENOENT") {
 			result.notices.push(`No config file at ${configPath} (skipping; create one to wire servers).`);
@@ -188,7 +191,7 @@ export async function loadConfig(configPath: string = DEFAULT_CONFIG_PATH): Prom
 
 	let parsed: unknown;
 	try {
-		parsed = JSON.parse(raw);
+		parsed = JSON.parse(fileContent);
 	} catch (err) {
 		throw new ConfigError(
 			`Malformed JSON in ${configPath}: ${err instanceof Error ? err.message : String(err)}`,
@@ -222,8 +225,8 @@ export async function loadConfig(configPath: string = DEFAULT_CONFIG_PATH): Prom
 		seen.add(name);
 	}
 
-	for (const raw of config.servers) {
-		result.servers.push(normalizeServer(raw, result.notices));
+	for (const entry of config.servers) {
+		result.servers.push(normalizeServer(entry, result.notices));
 	}
 
 	result.loaded = true;
@@ -264,16 +267,18 @@ function normalizeServer(
 	};
 }
 
-const ENV_INTERP_RE = /\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g;
-
 function expandEnvMap(
 	source: Record<string, string>,
 	serverName: string,
 	notices: string[],
 ): Record<string, string> {
 	const out: Record<string, string> = {};
+	// Constructed fresh per call so any future call sites using exec()/test()
+	// don't trip over a shared lastIndex. The `g` flag is required for
+	// String#replace to substitute every occurrence in a value.
+	const interpRe = /\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g;
 	for (const [key, value] of Object.entries(source)) {
-		out[key] = value.replace(ENV_INTERP_RE, (_match, varName: string) => {
+		out[key] = value.replace(interpRe, (_match, varName: string) => {
 			const resolved = process.env[varName];
 			if (resolved === undefined) {
 				notices.push(
