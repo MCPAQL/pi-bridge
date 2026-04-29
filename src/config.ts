@@ -17,6 +17,8 @@ import { join } from "node:path";
 
 import Ajv2020 from "ajv/dist/2020.js";
 
+import { isNodeError } from "./util.js";
+
 export type TrustLevel = "untrusted" | "user" | "developer" | "admin";
 export type EndpointMode = "multi" | "unified";
 
@@ -308,6 +310,3 @@ function expandEnvMap(
 	return out;
 }
 
-function isNodeError(err: unknown): err is NodeJS.ErrnoException {
-	return err instanceof Error && "code" in err;
-}

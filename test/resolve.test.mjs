@@ -83,6 +83,17 @@ test("permission denied on entry → distinguishes EACCES from missing file", as
 	}
 });
 
+test("bare .. routes through local resolution (not silent npx ..)", async () => {
+	// Without the explicit ".." check in isLocalPath, ".." has no slash so
+	// the ambiguous-slash guard wouldn't fire, and it doesn't startsWith
+	// "../" — it would silently fall through to `npx --yes ..`. Pin the
+	// behavior down: bare ".." is treated as a local path.
+	await assert.rejects(
+		resolveAdapter(adapterConfig("..")),
+		(err) => err instanceof Error && /expected/.test(err.message),
+	);
+});
+
 test("relative ../path also routes through local resolution", async () => {
 	// "../something" is a valid local-path prefix per isLocalPath. We don't
 	// need to construct a real ../something test fixture; the assertion is

@@ -72,13 +72,17 @@ Configured via `~/.pi/mcpaql.config.json`:
 
 | Spec | Resolves to | Example |
 |---|---|---|
-| **Local path** (absolute, `./relative`, `../relative`, `~/home`, bare `~`, Windows drive) | `node <path>/dist/server.js` — convention is the entry lives at `dist/server.js` inside the directory | `/Users/me/adapters/github` |
+| **Local path** (absolute, `./relative`, `../relative`, bare `..`, `~/home`, bare `~`) | `node <path>/dist/server.js` — convention is the entry lives at `dist/server.js` inside the directory | `/Users/me/adapters/github` |
 | **npm package** (bare name, scoped, version-pinned) | `npx --yes <name>` — npx handles fetch + cache automatically | `@mcpaql/generated-github-mcp@1.2.3` |
 | **git URL** (`git:host/owner/repo@ref` or `git+https://…`) | *Not yet implemented — tracked in issue #31* | `git:github.com/user/repo@v1` |
 
 Specs containing `/` that aren't the npm scoped form (`@scope/name`) are rejected with explicit guidance — `adapters/my-server` is treated as ambiguous and prompts you to use either `./adapters/my-server` (local) or `@scope/name` (npm).
 
+For local paths, the entry file at `<path>/dist/server.js` is checked for existence at startup, so a wrong path or missing build surfaces immediately with an actionable error rather than at first tool call. Permission-denied and missing-file cases produce distinct messages.
+
 The `dist/server.js` entry-point is convention; per-adapter entry overrides (or `package.json#bin` lookup) are tracked as a follow-up.
+
+> **Platform note.** Windows drive-letter paths (e.g. `C:\path\to\adapter`) are recognized as a local-path shape so Windows users get a sensible error message rather than silent dispatch to npx, but the supported runtime for this package is Node 20+ on Linux/macOS. Windows is not on the release matrix.
 
 ## Installation
 

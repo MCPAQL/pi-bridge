@@ -42,6 +42,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 import type { ResolvedAdapterConfig } from "./config.js";
+import { isNodeError } from "./util.js";
 
 export interface ResolvedSpawn {
 	command: string;
@@ -80,11 +81,13 @@ export async function resolveAdapter(server: ResolvedAdapterConfig): Promise<Res
 
 function isLocalPath(spec: string): boolean {
 	if (isAbsolute(spec)) return true;
-	if (spec.startsWith("./") || spec.startsWith("../")) return true;
+	if (spec.startsWith("./") || spec === ".." || spec.startsWith("../")) return true;
 	if (spec.startsWith("~/") || spec === "~") return true;
-	// Windows drive-letter absolute paths — `C:\foo`, `D:/bar`. Defensive;
-	// our supported runtime is Node 20+ on Linux/macOS, but the cost of
-	// recognizing the shape is one regex test.
+	// Windows drive-letter absolute paths — `C:\foo`, `D:/bar`. Recognized
+	// defensively so a Windows user pasting a drive path gets a sensible
+	// error instead of having it silently dispatched to npx. Note that the
+	// supported runtime is Node 20+ on Linux/macOS; Windows is not on the
+	// release matrix, so this is footprint, not full support.
 	if (/^[A-Za-z]:[\\/]/.test(spec)) return true;
 	return false;
 }
@@ -94,19 +97,27 @@ async function resolveLocalPath(spec: string): Promise<ResolvedSpawn> {
 	const absolute = isAbsolute(expanded) ? expanded : resolvePath(expanded);
 	const entry = join(absolute, DEFAULT_ENTRY_RELATIVE);
 
+	// Probe the entry up front so config errors surface at startup rather
+	// than at first tool call. We narrow on the error code so each failure
+	// mode gets actionable feedback:
+	//   ENOENT → "build the adapter first / wrong path"
+	//   EACCES → "permission denied / check perms"
+	//   anything else (EMFILE, EIO, …) → propagate verbatim, since giving
+	//     it our generic message would actively mislead the user.
 	try {
 		await access(entry);
 	} catch (err) {
-		// Distinguish "doesn't exist" from "permission denied" so the user
-		// gets actionable feedback rather than a generic "expected …" error.
 		if (isNodeError(err) && err.code === "EACCES") {
 			throw new Error(
 				`adapter local path "${spec}": permission denied reading ${entry} — check filesystem permissions on the adapter directory.`,
 			);
 		}
-		throw new Error(
-			`adapter local path "${spec}" — expected ${entry} (build the adapter first, or point adapter at a directory containing dist/server.js).`,
-		);
+		if (isNodeError(err) && err.code === "ENOENT") {
+			throw new Error(
+				`adapter local path "${spec}": expected ${entry} (build the adapter first, or point adapter at a directory containing ${DEFAULT_ENTRY_RELATIVE}).`,
+			);
+		}
+		throw err;
 	}
 
 	return { command: "node", args: [entry] };
@@ -116,8 +127,4 @@ function expandHome(spec: string): string {
 	if (spec === "~") return homedir();
 	if (spec.startsWith("~/")) return join(homedir(), spec.slice(2));
 	return spec;
-}
-
-function isNodeError(err: unknown): err is NodeJS.ErrnoException {
-	return err instanceof Error && "code" in err;
 }
