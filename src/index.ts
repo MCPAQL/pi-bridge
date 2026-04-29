@@ -12,6 +12,8 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
+import { type MCPHost, spawnHost } from "./host.js";
+
 export type TrustLevel = "untrusted" | "user" | "developer" | "admin";
 
 export type EndpointMode = "multi" | "unified";
@@ -32,24 +34,41 @@ const HARDCODED_SERVERS: ServerConfig[] = [
 ];
 
 const piBridge = async function (pi: ExtensionAPI): Promise<void> {
+	const hosts: MCPHost[] = [];
+	const failures: Array<{ name: string; reason: string }> = [];
+
+	for (const server of HARDCODED_SERVERS) {
+		try {
+			hosts.push(await spawnHost(server));
+		} catch (err) {
+			failures.push({
+				name: server.name,
+				reason: err instanceof Error ? err.message : String(err),
+			});
+		}
+	}
+
 	pi.on("session_start", async (_event, ctx) => {
-		const n = HARDCODED_SERVERS.length;
-		ctx.ui.notify(
-			n === 0
-				? "@mcpaql/pi-bridge loaded (no servers configured)"
-				: `@mcpaql/pi-bridge loaded — ${n} server(s)`,
-			"info",
-		);
+		if (hosts.length > 0) {
+			ctx.ui.notify(
+				`@mcpaql/pi-bridge loaded — ${hosts.length} server(s): ${hosts.map((h) => h.serverName).join(", ")}`,
+				"info",
+			);
+		} else {
+			ctx.ui.notify("@mcpaql/pi-bridge loaded (no servers configured)", "info");
+		}
+		for (const f of failures) {
+			ctx.ui.notify(`@mcpaql/pi-bridge: failed to spawn ${f.name} — ${f.reason}`, "warning");
+		}
 	});
 
-	for (const _server of HARDCODED_SERVERS) {
-		// #4 — spawn MCP child for `_server` and obtain a typed handle.
+	for (const _host of hosts) {
 		// #5 — register `<server>_create|_read|_update|_delete|_execute` Pi tools
-		//      that proxy to the host's mcp_aql_* calls.
+		//      that proxy to host.call(verb, operation, params).
 	}
 
 	pi.on("session_shutdown", async () => {
-		// #4 — terminate spawned MCP children here.
+		await Promise.allSettled(hosts.map((h) => h.close()));
 	});
 };
 
