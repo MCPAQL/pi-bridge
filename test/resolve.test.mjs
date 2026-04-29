@@ -4,7 +4,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
@@ -54,6 +54,46 @@ test("absolute path with no dist/server.js → throws with the expected entry pa
 	await assert.rejects(
 		resolveAdapter(adapterConfig(dir)),
 		(err) => err instanceof Error && err.message.includes(join(dir, "dist", "server.js")),
+	);
+});
+
+test("permission denied on entry → distinguishes EACCES from missing file", async (t) => {
+	// chmod 000 on a file makes access(F_OK) succeed but access(R_OK) fail
+	// on POSIX — node's fs/promises access checks F_OK by default, so to
+	// trigger EACCES we need to drop permissions on the parent directory
+	// instead. CI runners running as root bypass perms entirely; skip there.
+	if (process.getuid && process.getuid() === 0) {
+		t.skip("skipped: running as root, perms bypassed");
+		return;
+	}
+	const dir = await makeAdapterDir(workdir);
+	const distDir = join(dir, "dist");
+	await chmod(distDir, 0o000);
+	try {
+		await assert.rejects(
+			resolveAdapter(adapterConfig(dir)),
+			(err) =>
+				err instanceof Error &&
+				/permission denied/i.test(err.message) &&
+				err.message.includes(join(dir, "dist", "server.js")),
+		);
+	} finally {
+		// Restore perms so afterEach's rm() can clean up.
+		await chmod(distDir, 0o755);
+	}
+});
+
+test("relative ../path also routes through local resolution", async () => {
+	// "../something" is a valid local-path prefix per isLocalPath. We don't
+	// need to construct a real ../something test fixture; the assertion is
+	// that the spec is recognized as a local path and produces a path-based
+	// error (not handed off to npx).
+	await assert.rejects(
+		resolveAdapter(adapterConfig("../never-exists-mcpaql-test")),
+		(err) =>
+			err instanceof Error &&
+			/expected/.test(err.message) &&
+			err.message.includes(join("dist", "server.js")),
 	);
 });
 

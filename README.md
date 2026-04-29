@@ -63,10 +63,22 @@ Configured via `~/.pi/mcpaql.config.json`:
 }
 ```
 
-- `direct: true` — server already speaks MCP-AQL natively; talk straight to its `mcp_aql_*` tools.
-- `adapter: "<package>"` — wrap a non-MCP-AQL server with a generated adapter, then expose that.
+- `direct: true` — server already speaks MCP-AQL natively; talk straight to its `mcp_aql_*` tools. Requires `command` and `args`.
+- `adapter: "<spec>"` — wrap a non-MCP-AQL server with a generated adapter, then expose that. The spec recognizes three forms (see *Adapter spec forms* below).
 - `endpointMode: "multi" | "unified"` — 5 separate Pi tools per server, or 1 unified tool with the operation name in params.
 - `trust` — gatekeeper trust level for this server (`untrusted` / `user` / `developer` / `admin`).
+
+### Adapter spec forms
+
+| Spec | Resolves to | Example |
+|---|---|---|
+| **Local path** (absolute, `./relative`, `../relative`, `~/home`, bare `~`, Windows drive) | `node <path>/dist/server.js` — convention is the entry lives at `dist/server.js` inside the directory | `/Users/me/adapters/github` |
+| **npm package** (bare name, scoped, version-pinned) | `npx --yes <name>` — npx handles fetch + cache automatically | `@mcpaql/generated-github-mcp@1.2.3` |
+| **git URL** (`git:host/owner/repo@ref` or `git+https://…`) | *Not yet implemented — tracked in issue #31* | `git:github.com/user/repo@v1` |
+
+Specs containing `/` that aren't the npm scoped form (`@scope/name`) are rejected with explicit guidance — `adapters/my-server` is treated as ambiguous and prompts you to use either `./adapters/my-server` (local) or `@scope/name` (npm).
+
+The `dist/server.js` entry-point is convention; per-adapter entry overrides (or `package.json#bin` lookup) are tracked as a follow-up.
 
 ## Installation
 

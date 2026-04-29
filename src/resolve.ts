@@ -3,20 +3,38 @@
  * `adapter: "<spec>"` string into the {command, args} the host needs to
  * spawn it.
  *
- * Three input shapes are recognized:
+ * Three input shapes are recognized, in this strict order:
  *
- *   - **Local path** — absolute, ./relative, ~/home, or path-with-slash.
- *     Convention: <path>/dist/server.js is the entry. Spawned with `node`.
+ *   1. **git URL** — `git:host/owner/repo@ref` or `git+https://…`.
+ *      Currently throws "not yet implemented" — clone/install/cache lands
+ *      in a follow-up. Checked first so a leading `git:` is never mistaken
+ *      for an npm package whose name happens to start with `git`.
  *
- *   - **npm package** — bare name like `@mcpaql/foo` or `pkg`. Spawned via
- *     `npx --yes <name>`; npx handles fetch + cache automatically.
+ *   2. **Local path** — absolute, `./relative`, `../relative`, `~/home`,
+ *      bare `~`, or Windows drive paths. Convention: `<path>/dist/server.js`
+ *      is the entry. Spawned with `node`. Checked second so explicit local
+ *      forms always win over ambiguous interpretation.
  *
- *   - **git URL** — `git:host/owner/repo@ref` (Pi-mono convention). Not
- *     yet implemented; throws a clear error pointing at the tracking
- *     issue. The clone+install+cache work lands in a follow-up.
+ *   3. **npm package** — bare name like `@mcpaql/foo`, `pkg`, or
+ *      version-pinned `pkg@1.2.3` / `@scope/name@1.2.3`. Spawned via
+ *      `npx --yes <name>`; npx handles fetch + cache automatically.
+ *      Specs with embedded slashes that aren't valid scoped-package shape
+ *      are rejected as ambiguous before reaching this branch.
+ *
+ * Trust model: the adapter spec comes from a config file the user owns
+ * (`~/.pi/mcpaql.config.json`), so `npx --yes <whatever-the-user-wrote>`
+ * runs whatever the user typed. This is acceptable because the config is
+ * local and user-controlled. If config ever flows in from a remote source,
+ * this assumption needs revisiting.
  *
  * Errors are thrown so the entrypoint can route them through the same
  * failures[] path as spawn failures, surfacing via ctx.ui.notify.
+ *
+ * Future work tracked separately:
+ *   - git URL support (clone + install + cache)
+ *   - Per-adapter entry override (when `dist/server.js` doesn't fit) —
+ *     candidates: read `package.json` `bin` field, or accept an object
+ *     spec `{ path, entry }`.
  */
 
 import { access } from "node:fs/promises";
@@ -29,6 +47,14 @@ export interface ResolvedSpawn {
 	command: string;
 	args: string[];
 }
+
+const DEFAULT_ENTRY_RELATIVE = join("dist", "server.js");
+
+// npm scoped-package shape: `@scope/name`, no extra slashes. Used to
+// distinguish legitimate scoped names from ambiguous slash-containing
+// strings like `adapters/my-server` that almost always indicate a missing
+// `./` prefix.
+const SCOPED_PACKAGE_RE = /^@[^/]+\/[^/]+$/;
 
 export async function resolveAdapter(server: ResolvedAdapterConfig): Promise<ResolvedSpawn> {
 	const spec = server.adapter;
@@ -43,17 +69,12 @@ export async function resolveAdapter(server: ResolvedAdapterConfig): Promise<Res
 		return resolveLocalPath(spec);
 	}
 
-	// Reject ambiguous specs that look like paths but aren't explicitly
-	// rooted. Without this, "adapters/my-server" would silently resolve to
-	// `npx adapters/my-server`, which is almost never what the user meant.
-	// The only legitimate slash-containing form for npm is @scope/name.
-	if (spec.includes("/") && !/^@[^/]+\/[^/]+$/.test(spec)) {
+	if (spec.includes("/") && !SCOPED_PACKAGE_RE.test(spec)) {
 		throw new Error(
 			`adapter "${spec}": looks like a path but isn't rooted. Prefix with "./" for a relative path, or use the npm scoped-package form @scope/name.`,
 		);
 	}
 
-	// Anything else: treat as an npm package name. npx handles cache + install.
 	return { command: "npx", args: ["--yes", spec] };
 }
 
@@ -61,8 +82,9 @@ function isLocalPath(spec: string): boolean {
 	if (isAbsolute(spec)) return true;
 	if (spec.startsWith("./") || spec.startsWith("../")) return true;
 	if (spec.startsWith("~/") || spec === "~") return true;
-	// Accept Windows-style absolute paths if someone hands us one (defensive;
-	// our supported runtimes are Node 20+ on Linux/macOS, but easy to allow).
+	// Windows drive-letter absolute paths — `C:\foo`, `D:/bar`. Defensive;
+	// our supported runtime is Node 20+ on Linux/macOS, but the cost of
+	// recognizing the shape is one regex test.
 	if (/^[A-Za-z]:[\\/]/.test(spec)) return true;
 	return false;
 }
@@ -70,11 +92,18 @@ function isLocalPath(spec: string): boolean {
 async function resolveLocalPath(spec: string): Promise<ResolvedSpawn> {
 	const expanded = expandHome(spec);
 	const absolute = isAbsolute(expanded) ? expanded : resolvePath(expanded);
-	const entry = join(absolute, "dist", "server.js");
+	const entry = join(absolute, DEFAULT_ENTRY_RELATIVE);
 
 	try {
 		await access(entry);
-	} catch {
+	} catch (err) {
+		// Distinguish "doesn't exist" from "permission denied" so the user
+		// gets actionable feedback rather than a generic "expected …" error.
+		if (isNodeError(err) && err.code === "EACCES") {
+			throw new Error(
+				`adapter local path "${spec}": permission denied reading ${entry} — check filesystem permissions on the adapter directory.`,
+			);
+		}
 		throw new Error(
 			`adapter local path "${spec}" — expected ${entry} (build the adapter first, or point adapter at a directory containing dist/server.js).`,
 		);
@@ -87,4 +116,8 @@ function expandHome(spec: string): string {
 	if (spec === "~") return homedir();
 	if (spec.startsWith("~/")) return join(homedir(), spec.slice(2));
 	return spec;
+}
+
+function isNodeError(err: unknown): err is NodeJS.ErrnoException {
+	return err instanceof Error && "code" in err;
 }
