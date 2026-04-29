@@ -84,6 +84,64 @@ The `dist/server.js` entry-point is convention; per-adapter entry overrides (or 
 
 > **Platform note.** Windows drive-letter paths (e.g. `C:\path\to\adapter`) are recognized as a local-path shape so Windows users get a sensible error message rather than silent dispatch to npx, but the supported runtime for this package is Node 20+ on Linux/macOS. Windows is not on the release matrix.
 
+## Quick start with DollhouseMCP
+
+[DollhouseMCP](https://github.com/DollhouseMCP/mcp-server) speaks MCP-AQL natively, so you can wire it up without writing or generating an adapter. This is the fastest way to see the bridge end-to-end against a real server.
+
+1. **Copy the example config** to where the bridge looks for it:
+
+   ```bash
+   mkdir -p ~/.pi
+   cp examples/mcpaql.config.example.json ~/.pi/mcpaql.config.json
+   ```
+
+2. **Trim it down to just the dollhouse entry** for now (the example also ships a `github` block that points at a placeholder local path; remove or repoint that one before launching pi):
+
+   ```jsonc
+   {
+     "servers": [
+       {
+         "name": "dollhouse",
+         "transport": "stdio",
+         "command": "npx",
+         "args": ["--yes", "@dollhousemcp/mcp-server"],
+         "direct": true,
+         "trust": "developer",
+         "endpointMode": "multi"
+       }
+     ]
+   }
+   ```
+
+3. **Smoke-test the wiring** without booting pi:
+
+   ```bash
+   npm run smoke:dollhouse
+   ```
+
+   This spawns `npx --yes @dollhousemcp/mcp-server`, calls `read/introspect`, and prints the operations list. First run pulls the package; subsequent runs hit the npx cache.
+
+4. **Launch pi** with the bridge as an extension. Once registered, the LLM sees `dollhouse_create` / `dollhouse_read` / `dollhouse_update` / `dollhouse_delete` / `dollhouse_execute` and can call `dollhouse_read introspect` to discover what dollhouse offers.
+
+### Adapter-mode equivalent
+
+Same upstream, slightly different config shape — uses #6's npm resolver instead of `direct`:
+
+```jsonc
+{
+  "name": "dollhouse",
+  "adapter": "@dollhousemcp/mcp-server",
+  "trust": "developer",
+  "endpointMode": "multi"
+}
+```
+
+Both forms end up running `npx @dollhousemcp/mcp-server` as a stdio child. The `direct: true` form is canonical for natively-MCP-AQL servers; the `adapter:` form is the same npm-resolution path generated adapters use.
+
+### Known conformance gaps
+
+Live `read/introspect` against `@dollhousemcp/mcp-server` returns operations whose summary objects use `element_name` instead of the spec's `name` field. The bridge's discriminated-response envelope (`{ success, data }`) still validates, so call-and-response works end-to-end, but `OperationInfo`-shape strict validation flags this. The conformance test in `test/conformance-dollhouse.test.mjs` asserts both states (envelope passes, strict shape fails) and serves as a regression marker — when DollhouseMCP closes the gap, that test will need a fixture refresh.
+
 ## Installation
 
 > Not yet published. Until then, see the issues for the walking-skeleton plan.
