@@ -1,0 +1,53 @@
+{
+  "name": "@mcpaql/pi-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pi coding-agent extension that hosts MCP-AQL adapters and exposes their CRUDE operations as Pi tools",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "test": "echo 'tests not yet wired up' && exit 0"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MCPAQL/pi-bridge.git"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-aql",
+    "mcpaql",
+    "pi",
+    "pi-coding-agent",
+    "agent",
+    "extension",
+    "bridge"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": ">=0.70.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}
