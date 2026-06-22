@@ -34,3 +34,4 @@ CLAUDE.md
 
 # DollhouseMCP (local MCP server state)
 .dollhousemcp/
+.handoff/

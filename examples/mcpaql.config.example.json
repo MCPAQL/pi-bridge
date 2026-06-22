@@ -1,0 +1,13 @@
+{
+  "servers": [
+    {
+      "name": "dollhouse",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["--yes", "@dollhousemcp/mcp-server"],
+      "direct": true,
+      "trust": "developer",
+      "endpointMode": "multi"
+    }
+  ]
+}

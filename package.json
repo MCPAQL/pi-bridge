@@ -23,6 +23,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build",
     "test": "node --test test/*.test.mjs",
+    "presmoke:dollhouse": "npm run build",
+    "smoke:dollhouse": "node scripts/smoke-dollhouse.mjs",
+    "presmoke:entrypoint": "npm run build",
+    "smoke:entrypoint": "node scripts/smoke-entrypoint.mjs",
     "test:docker": "docker build -t mcpaql-pi-bridge-test . && docker run --rm mcpaql-pi-bridge-test",
     "test:docker:shell": "docker build -t mcpaql-pi-bridge-test . && docker run --rm -it mcpaql-pi-bridge-test bash",
     "test:matrix": "bash scripts/test-matrix.sh"
@@ -49,11 +53,11 @@
     "@mariozechner/pi-coding-agent": ">=0.70.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1"
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "ajv": "^8.17.1"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
-    "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "typescript": "^5.9.2"
   }
