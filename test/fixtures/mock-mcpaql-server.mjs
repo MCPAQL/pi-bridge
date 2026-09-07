@@ -10,6 +10,9 @@
  * Operations:
  *   - "introspect"      → success with a small operations list
  *   - "echo"            → success, echoes the calling tool name and params
+ *   - "echo_env"        → success, echoes process.env[params.var] as seen
+ *                         by the spawned child (used to verify env
+ *                         interpolation reaches the child end-to-end)
  *   - "fail_validation" → failure with VALIDATION_ERROR
  *   - "structured_only" → success, structuredContent only (no text frame)
  *   - "text_only"       → success, text frame only (no structuredContent)
@@ -65,6 +68,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 				operations: [
 					{ name: "introspect", endpoint: "READ", description: "self" },
 					{ name: "echo", endpoint: "READ", description: "echo" },
+					{ name: "echo_env", endpoint: "READ", description: "echo a process.env value" },
 				],
 			},
 		});
@@ -74,6 +78,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 		return frame({
 			success: true,
 			data: { tool: toolName, operation: op, params },
+		});
+	}
+
+	if (op === "echo_env") {
+		const varName = typeof params.var === "string" ? params.var : "";
+		return frame({
+			success: true,
+			data: { var: varName, value: process.env[varName] ?? null },
 		});
 	}
 
