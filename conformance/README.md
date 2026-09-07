@@ -9,8 +9,8 @@ bridge match the spec's discriminated-union shape.
 
 | Schema | Source | Synced at |
 |---|---|---|
-| `operation-result.schema.json` | `spec/schemas/operation-result.schema.json` | spec @ `5264015` |
-| `introspection-response.schema.json` | `spec/schemas/introspection-response.schema.json` | spec @ `5264015` |
+| `operation-result.schema.json` | `spec/schemas/operation-result.schema.json` | spec @ `21006f6` |
+| `introspection-response.schema.json` | `spec/schemas/introspection-response.schema.json` | spec @ `21006f6` |
 
 ## Resyncing
 
